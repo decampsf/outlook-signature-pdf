@@ -4,7 +4,7 @@ const el = id => document.getElementById(id);
 const canvas = el('canvas');
 const ctx = canvas.getContext('2d');
 const stamp = el('stamp');
-const state = {item:null,files:[],active:0,page:1,pdf:null,stampUrl:null,stampBytes:null,signatures:[],selectedSignatureId:null,storageError:null,position:{x:.7,y:.78},placements:new Map(),renderToken:0};
+const state = {item:null,files:[],active:0,page:1,pdf:null,zoom:1,stampUrl:null,stampBytes:null,signatures:[],selectedSignatureId:null,storageError:null,position:{x:.7,y:.78},placements:new Map(),renderToken:0};
 const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
 function message(text,error=false){el('status').textContent=text;el('status').classList.toggle('error',error)}
 function decodeBase64(text){const binary=atob(text);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return bytes}
@@ -85,8 +85,14 @@ function renderFileList(){
     input.addEventListener('change',()=>selectFile(index));label.append(input,document.createTextNode(file.name));root.append(label);
   });
 }
+function showZoom(){
+  el('zoomValue').textContent=Math.round(state.zoom*100)+' %';
+  el('zoomOut').disabled=state.zoom<=.5;
+  el('zoomIn').disabled=state.zoom>=3;
+  el('zoomReset').disabled=state.zoom===1;
+}
 async function selectFile(index){
-  state.active=index;state.page=1;state.pdf=null;state.position={x:.7,y:.78};renderFileList();renderPlacements();
+  ++state.renderToken;state.active=index;state.page=1;state.pdf=null;state.zoom=1;showZoom();state.position={x:.7,y:.78};renderFileList();renderPlacements();
   const file=state.files[index];message('Ouverture de '+file.name+'…');
   try{
     if(!file.bytes){
@@ -98,15 +104,22 @@ async function selectFile(index){
     state.pdf=file.pdf;await renderPage();message(file.name+' prêt.'+(state.storageError?' '+state.storageError:''),!!state.storageError);
   }catch(error){message('Impossible d’ouvrir '+file.name+' : '+error.message,true)}
 }
-async function renderPage(){
+async function renderPage(preserveView=false){
   if(!state.pdf)return;
-  const token=++state.renderToken;const page=await state.pdf.getPage(state.page);const base=page.getViewport({scale:1});
+  const token=++state.renderToken;const page=await state.pdf.getPage(state.page);if(token!==state.renderToken)return;
+  const base=page.getViewport({scale:1});
   const target=Math.max(210,Math.min(650,el('paper').parentElement.clientWidth-28));
-  const viewport=page.getViewport({scale:target/base.width});
+  const viewport=page.getViewport({scale:target/base.width*state.zoom});
   if(token!==state.renderToken)return;
-  canvas.width=Math.round(viewport.width);canvas.height=Math.round(viewport.height);
-  await page.render({canvasContext:ctx,viewport}).promise;
+  const rendered=document.createElement('canvas');rendered.width=Math.round(viewport.width);rendered.height=Math.round(viewport.height);
+  await page.render({canvasContext:rendered.getContext('2d'),viewport}).promise;
   if(token!==state.renderToken)return;
+  const wrap=el('paper').parentElement;
+  const centerX=preserveView?(wrap.scrollLeft+wrap.clientWidth/2)/(canvas.width||1):0;
+  const centerY=preserveView?(wrap.scrollTop+wrap.clientHeight/2)/(canvas.height||1):0;
+  canvas.width=rendered.width;canvas.height=rendered.height;ctx.drawImage(rendered,0,0);
+  if(preserveView){wrap.scrollLeft=centerX*canvas.width-wrap.clientWidth/2;wrap.scrollTop=centerY*canvas.height-wrap.clientHeight/2}
+  else{wrap.scrollLeft=0;wrap.scrollTop=0}
   el('pageInfo').textContent=`Page ${state.page}/${state.pdf.numPages}`;
   el('prev').disabled=state.page===1;el('next').disabled=state.page===state.pdf.numPages;
   placeStamp();renderPlacements();
@@ -151,6 +164,10 @@ el('clearStamp').onclick=async()=>{
   }catch(error){message('Impossible de supprimer la signature : '+error.message,true)}
 };
 el('size').oninput=()=>{el('sizeValue').textContent=el('size').value+' %';placeStamp()};
+el('zoomOut').onclick=()=>{state.zoom=clamp(state.zoom-.25,.5,3);showZoom();renderPage(true)};
+el('zoomIn').onclick=()=>{state.zoom=clamp(state.zoom+.25,.5,3);showZoom();renderPage(true)};
+el('zoomReset').onclick=()=>{state.zoom=1;showZoom();renderPage(true)};
+showZoom();
 el('prev').onclick=()=>{if(state.pdf&&state.page>1){state.page--;renderPage()}};
 el('next').onclick=()=>{if(state.pdf&&state.page<state.pdf.numPages){state.page++;renderPage()}};
 el('addPlacement').onclick=()=>{

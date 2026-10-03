@@ -7,7 +7,7 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <header><h1>Signer les PDF</h1><p>Pièces jointes du message ouvert</p></header>
@@ -29,6 +29,7 @@
     </section>
     <section class="card">
       <div class="nav"><button id="prev" type="button">←</button><span id="pageInfo">Aucune page</span><button id="next" type="button">→</button></div>
+      <div class="zoom"><span>Zoom du PDF</span><button id="zoomOut" type="button" aria-label="Dézoomer">−</button><output id="zoomValue">100 %</output><button id="zoomIn" type="button" aria-label="Zoomer">+</button><button id="zoomReset" type="button">Revenir à 100 %</button></div>
       <div class="paper-wrap"><div id="paper" class="paper"><canvas id="canvas"></canvas><img id="stamp" alt="Tampon à déplacer"></div></div>
       <p class="hint">Déplacez le tampon sur chaque page à signer, puis cliquez sur « Ajouter ici ». Vous pouvez signer plusieurs pages.</p>
       <button id="addPlacement" class="secondary" type="button">Ajouter ici</button>
@@ -37,6 +38,6 @@
     <button id="reply" class="primary" type="button">Préparer la réponse avec les PDF signés</button>
     <p class="hint">Vérifiez les PDF et les destinataires dans la réponse avant l’envoi.</p>
   </main>
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
