@@ -108,7 +108,7 @@ async function renderPage(preserveView=false){
   if(!state.pdf)return;
   const token=++state.renderToken;const page=await state.pdf.getPage(state.page);if(token!==state.renderToken)return;
   const base=page.getViewport({scale:1});
-  const target=Math.max(210,Math.min(650,el('paper').parentElement.clientWidth-28));
+  const target=Math.max(210,Math.min(650,el('paper').parentElement.getBoundingClientRect().width-28));
   const viewport=page.getViewport({scale:target/base.width*state.zoom});
   if(token!==state.renderToken)return;
   const rendered=document.createElement('canvas');rendered.width=Math.round(viewport.width);rendered.height=Math.round(viewport.height);
