@@ -18,9 +18,12 @@
       <div id="attachments" class="attachments"></div>
     </section>
     <section class="card">
-      <label for="stampFile">Tampon PNG</label>
+      <label for="savedStamps">Signatures enregistrées sur cet appareil</label>
+      <select id="savedStamps" aria-label="Choisir une signature enregistrée"><option value="">Aucune signature enregistrée</option></select>
+      <div class="stamp-row"><span id="stampName">Aucune signature choisie</span><button id="clearStamp" type="button" disabled>Supprimer cette signature</button></div>
+      <label for="stampFile">Ajouter une signature PNG</label>
       <input id="stampFile" type="file" accept="image/png,.png">
-      <div class="stamp-row"><span id="stampName">Aucun tampon choisi</span><button id="clearStamp" type="button">Effacer</button></div>
+      <p class="hint">Les signatures restent dans le stockage local de cet appareil. Vous pouvez en conserver plusieurs et les supprimer ici.</p>
       <label for="size">Taille du tampon : <output id="sizeValue">30 %</output></label>
       <input id="size" type="range" min="10" max="60" value="30">
     </section>
@@ -34,6 +37,6 @@
     <button id="reply" class="primary" type="button">Préparer la réponse avec les PDF signés</button>
     <p class="hint">Vérifiez les PDF et les destinataires dans la réponse avant l’envoi.</p>
   </main>
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

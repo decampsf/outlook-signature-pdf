@@ -4,14 +4,67 @@ const el = id => document.getElementById(id);
 const canvas = el('canvas');
 const ctx = canvas.getContext('2d');
 const stamp = el('stamp');
-const state = {item:null,files:[],active:0,page:1,pdf:null,stampUrl:null,stampBytes:null,position:{x:.7,y:.78},placements:new Map(),renderToken:0};
+const state = {item:null,files:[],active:0,page:1,pdf:null,stampUrl:null,stampBytes:null,signatures:[],selectedSignatureId:null,storageError:null,position:{x:.7,y:.78},placements:new Map(),renderToken:0};
 const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
 function message(text,error=false){el('status').textContent=text;el('status').classList.toggle('error',error)}
 function decodeBase64(text){const binary=atob(text);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return bytes}
 function encodeBase64(bytes){let result='';for(let i=0;i<bytes.length;i+=32768)result+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(result)}
+function openSignatureDb(){return new Promise((resolve,reject)=>{
+  if(!window.indexedDB){reject(new Error('Le stockage local est indisponible.'));return}
+  const request=indexedDB.open('outlook-pdf-signatures',1);
+  request.onupgradeneeded=()=>request.result.createObjectStore('signatures',{keyPath:'id'});
+  request.onsuccess=()=>resolve(request.result);
+  request.onerror=()=>reject(request.error||new Error('Ouverture du stockage impossible.'));
+})}
+async function signatureStore(mode,operation){
+  const db=await openSignatureDb();
+  try{return await new Promise((resolve,reject)=>{
+    const transaction=db.transaction('signatures',mode);const request=operation(transaction.objectStore('signatures'));
+    let result;
+    request.onsuccess=()=>{result=request.result};
+    request.onerror=()=>reject(request.error||new Error('Enregistrement impossible.'));
+    transaction.onerror=()=>reject(transaction.error||new Error('Enregistrement impossible.'));
+    transaction.oncomplete=()=>resolve(result);
+  })}finally{db.close()}
+}
+function selectedId(){try{return localStorage.getItem('outlook-pdf-selected-signature')}catch{return null}}
+function rememberSelection(id){try{if(id)localStorage.setItem('outlook-pdf-selected-signature',id);else localStorage.removeItem('outlook-pdf-selected-signature')}catch{}}
+function renderSignatureChoices(){
+  const select=el('savedStamps');select.replaceChildren();
+  const empty=document.createElement('option');empty.value='';empty.textContent=state.signatures.length?'Choisir une signature':'Aucune signature enregistrée';select.append(empty);
+  for(const signature of state.signatures){const option=document.createElement('option');option.value=signature.id;option.textContent=signature.name;select.append(option)}
+  select.value=state.selectedSignatureId||'';
+  el('clearStamp').disabled=!state.selectedSignatureId;
+}
+function setStamp(signature){
+  state.selectedSignatureId=signature?.id||null;
+  state.stampUrl=signature?.dataUrl||null;
+  state.stampBytes=signature?decodeBase64(signature.dataUrl.split(',')[1]):null;
+  if(signature){stamp.src=signature.dataUrl;el('stampName').textContent=signature.name}
+  else{stamp.removeAttribute('src');stamp.style.display='none';el('stampName').textContent='Aucune signature choisie'}
+  rememberSelection(state.selectedSignatureId);renderSignatureChoices();placeStamp();
+}
+async function loadSignatures(){
+  try{
+    state.signatures=await signatureStore('readonly',store=>store.getAll());
+    if(!state.signatures.length){
+      let oldUrl=null,oldName='Signature enregistrée';
+      try{oldUrl=localStorage.getItem('outlook-pdf-stamp');oldName=localStorage.getItem('outlook-pdf-stamp-name')||oldName}catch{}
+      if(oldUrl?.startsWith('data:image/png;base64,')){
+        const migrated={id:crypto.randomUUID(),name:oldName,dataUrl:oldUrl};
+        await signatureStore('readwrite',store=>store.put(migrated));state.signatures=[migrated];
+        try{localStorage.removeItem('outlook-pdf-stamp');localStorage.removeItem('outlook-pdf-stamp-name')}catch{}
+      }
+    }
+    state.signatures.sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+    const preferred=state.signatures.find(s=>s.id===selectedId())||state.signatures[0];
+    setStamp(preferred||null);
+  }catch(error){state.storageError='Signatures non mémorisées : '+error.message;renderSignatureChoices()}
+}
 function getAttachment(item,id){return new Promise((resolve,reject)=>item.getAttachmentContentAsync(id,result=>result.status===Office.AsyncResultStatus.Succeeded?resolve(result.value):reject(new Error(result.error?.message||'Lecture impossible'))))}
 async function initialize(){
   try{
+    await loadSignatures();
     if(typeof Office==='undefined')throw new Error('Ouvrez cette page depuis un message Outlook.');
     await Office.onReady();
     if(!Office.context?.mailbox)throw new Error('Ouvrez cette extension depuis un message Outlook.');
@@ -42,7 +95,7 @@ async function selectFile(index){
       file.bytes=decodeBase64(content.content);
     }
     if(!file.pdf)file.pdf=await pdfjsLib.getDocument({data:file.bytes.slice()}).promise;
-    state.pdf=file.pdf;await renderPage();message(file.name+' prêt.');
+    state.pdf=file.pdf;await renderPage();message(file.name+' prêt.'+(state.storageError?' '+state.storageError:''),!!state.storageError);
   }catch(error){message('Impossible d’ouvrir '+file.name+' : '+error.message,true)}
 }
 async function renderPage(){
@@ -78,21 +131,32 @@ stamp.onpointermove=event=>{
 stamp.onpointerup=stamp.onpointercancel=()=>drag=null;
 el('stampFile').onchange=async event=>{
   const file=event.target.files?.[0];if(!file)return;
-  if(file.type!=='image/png'){message('Choisissez un fichier PNG.',true);return}
-  const bytes=new Uint8Array(await file.arrayBuffer());
-  const url='data:image/png;base64,'+encodeBase64(bytes);
-  try{localStorage.setItem('outlook-pdf-stamp',url);localStorage.setItem('outlook-pdf-stamp-name',file.name)}catch{}
-  setStamp(url,file.name);
+  try{
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    if(bytes.length<8||![137,80,78,71,13,10,26,10].every((value,index)=>bytes[index]===value))throw new Error('Choisissez une image PNG valide.');
+    const signature={id:crypto.randomUUID(),name:file.name,dataUrl:'data:image/png;base64,'+encodeBase64(bytes)};
+    await signatureStore('readwrite',store=>store.put(signature));
+    state.signatures.push(signature);state.signatures.sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+    state.storageError=null;setStamp(signature);message('Signature « '+file.name+' » enregistrée sur cet appareil.');
+  }catch(error){message('Impossible de mémoriser la signature : '+error.message,true)}
+  finally{event.target.value=''}
 };
-function setStamp(url,name){state.stampUrl=url;state.stampBytes=decodeBase64(url.split(',')[1]);stamp.src=url;el('stampName').textContent=name;placeStamp()}
-el('clearStamp').onclick=()=>{localStorage.removeItem('outlook-pdf-stamp');localStorage.removeItem('outlook-pdf-stamp-name');state.stampUrl=null;state.stampBytes=null;stamp.removeAttribute('src');stamp.style.display='none';el('stampName').textContent='Aucun tampon choisi'};
+el('savedStamps').onchange=event=>{const signature=state.signatures.find(s=>s.id===event.target.value);setStamp(signature||null)};
+el('clearStamp').onclick=async()=>{
+  const id=state.selectedSignatureId;if(!id)return;
+  try{
+    await signatureStore('readwrite',store=>store.delete(id));
+    state.signatures=state.signatures.filter(s=>s.id!==id);setStamp(state.signatures[0]||null);
+    message('Signature supprimée de cet appareil.');
+  }catch(error){message('Impossible de supprimer la signature : '+error.message,true)}
+};
 el('size').oninput=()=>{el('sizeValue').textContent=el('size').value+' %';placeStamp()};
 el('prev').onclick=()=>{if(state.pdf&&state.page>1){state.page--;renderPage()}};
 el('next').onclick=()=>{if(state.pdf&&state.page<state.pdf.numPages){state.page++;renderPage()}};
 el('addPlacement').onclick=()=>{
   if(!state.pdf||!state.stampBytes){message('Ouvrez un PDF et choisissez un tampon PNG.',true);return}
   const key=state.active+':'+state.page;
-  state.placements.set(key,{file:state.active,page:state.page,x:state.position.x,y:state.position.y,size:Number(el('size').value)});
+  state.placements.set(key,{file:state.active,page:state.page,x:state.position.x,y:state.position.y,size:Number(el('size').value),signature:state.stampUrl});
   renderPlacements();message('Tampon ajouté sur la page '+state.page+'.');
 };
 function renderPlacements(){
@@ -103,15 +167,17 @@ function renderPlacements(){
 }
 function openReply(formData){return new Promise((resolve,reject)=>state.item.displayReplyFormAsync(formData,result=>result.status===Office.AsyncResultStatus.Succeeded?resolve():reject(new Error(result.error?.message||'Réponse impossible'))))}
 el('reply').onclick=async()=>{
-  if(!state.stampBytes||state.placements.size===0){message('Ajoutez au moins un tampon sur une page.',true);return}
+  if(state.placements.size===0){message('Ajoutez au moins une signature sur une page.',true);return}
   const button=el('reply');button.disabled=true;message('Création des PDF signés…');
   try{
     const attachments=[];
     for(let index=0;index<state.files.length;index++){
       const file=state.files[index];const placements=[...state.placements.values()].filter(p=>p.file===index);
       if(!placements.length)continue;
-      const doc=await PDFLib.PDFDocument.load(file.bytes.slice());const image=await doc.embedPng(state.stampBytes);
+      const doc=await PDFLib.PDFDocument.load(file.bytes.slice());const images=new Map();
       for(const p of placements){const page=doc.getPages()[p.page-1];if(!page)continue;
+        if(!images.has(p.signature))images.set(p.signature,await doc.embedPng(decodeBase64(p.signature.split(',')[1])));
+        const image=images.get(p.signature);
         const width=page.getWidth()*p.size/100,height=width*image.height/image.width;
         page.drawImage(image,{x:p.x*page.getWidth()-width/2,y:(1-p.y)*page.getHeight()-height/2,width,height});
       }
@@ -126,5 +192,4 @@ el('reply').onclick=async()=>{
   }catch(error){message('Impossible de préparer la réponse : '+error.message,true)}
   finally{button.disabled=false}
 };
-try{const saved=localStorage.getItem('outlook-pdf-stamp');if(saved)setStamp(saved,localStorage.getItem('outlook-pdf-stamp-name')||'Tampon enregistré')}catch{}
 initialize();
