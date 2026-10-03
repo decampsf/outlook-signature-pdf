@@ -14,7 +14,8 @@ async function initialize(){
   try{
     if(typeof Office==='undefined')throw new Error('Ouvrez cette page depuis un message Outlook.');
     await Office.onReady();
-    if(!Office.context.requirements.isSetSupported('Mailbox','1.15'))throw new Error('Cette version d’Outlook ne permet pas de joindre automatiquement les PDF signés.');
+    if(!Office.context?.mailbox)throw new Error('Ouvrez cette extension depuis un message Outlook.');
+    if(!Office.context.requirements?.isSetSupported('Mailbox','1.15'))throw new Error('Cette version d’Outlook ne permet pas de joindre automatiquement les PDF signés.');
     const item=Office.context.mailbox.item;
     if(!item?.attachments||!item.displayReplyFormAsync)throw new Error('Ouvrez un message reçu dans Outlook.');
     state.item=item;
