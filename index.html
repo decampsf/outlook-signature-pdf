@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signer les PDF</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header><h1>Signer les PDF</h1><p>Pièces jointes du message ouvert</p></header>
+  <main>
+    <div id="status" role="status" aria-live="polite">Chargement…</div>
+    <section class="card">
+      <label for="attachments">PDF à signer</label>
+      <div id="attachments" class="attachments"></div>
+    </section>
+    <section class="card">
+      <label for="stampFile">Tampon PNG</label>
+      <input id="stampFile" type="file" accept="image/png,.png">
+      <div class="stamp-row"><span id="stampName">Aucun tampon choisi</span><button id="clearStamp" type="button">Effacer</button></div>
+      <label for="size">Taille du tampon : <output id="sizeValue">30 %</output></label>
+      <input id="size" type="range" min="10" max="60" value="30">
+    </section>
+    <section class="card">
+      <div class="nav"><button id="prev" type="button">←</button><span id="pageInfo">Aucune page</span><button id="next" type="button">→</button></div>
+      <div class="paper-wrap"><div id="paper" class="paper"><canvas id="canvas"></canvas><img id="stamp" alt="Tampon à déplacer"></div></div>
+      <p class="hint">Déplacez le tampon sur chaque page à signer, puis cliquez sur « Ajouter ici ». Vous pouvez signer plusieurs pages.</p>
+      <button id="addPlacement" class="secondary" type="button">Ajouter ici</button>
+      <div id="placements" class="placements"></div>
+    </section>
+    <button id="reply" class="primary" type="button">Préparer la réponse avec les PDF signés</button>
+    <p class="hint">Vérifiez les PDF et les destinataires dans la réponse avant l’envoi.</p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
