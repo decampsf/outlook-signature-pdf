@@ -30,7 +30,7 @@
     <section class="card">
       <div class="nav"><button id="prev" type="button">←</button><span id="pageInfo">Aucune page</span><button id="next" type="button">→</button></div>
       <div class="zoom"><span>Zoom du PDF</span><button id="zoomOut" type="button" aria-label="Dézoomer">−</button><output id="zoomValue">100 %</output><button id="zoomIn" type="button" aria-label="Zoomer">+</button><button id="zoomReset" type="button">Revenir à 100 %</button></div>
-      <div class="paper-wrap"><div id="paper" class="paper"><canvas id="canvas"></canvas><img id="stamp" alt="Tampon à déplacer"></div></div>
+      <div class="paper-wrap"><div id="paper" class="paper"><canvas id="canvas"></canvas><img id="stamp" alt="Tampon à déplacer"><div id="stampCaption" aria-hidden="true"></div></div></div>
       <p class="hint">Déplacez le tampon sur chaque page à signer, puis cliquez sur « Ajouter ici ». Vous pouvez signer plusieurs pages.</p>
       <button id="addPlacement" class="secondary" type="button">Ajouter ici</button>
       <div id="placements" class="placements"></div>
@@ -38,6 +38,6 @@
     <button id="reply" class="primary" type="button">Préparer la réponse avec les PDF signés</button>
     <p class="hint">Vérifiez les PDF et les destinataires dans la réponse avant l’envoi.</p>
   </main>
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>
