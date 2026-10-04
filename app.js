@@ -5,16 +5,20 @@ const canvas = el('canvas');
 const ctx = canvas.getContext('2d');
 const stamp = el('stamp');
 const stampCaption = el('stampCaption');
-const SIGNER_NAME = 'F.DECAMPS-Directeur';
+const DEFAULT_SIGNER_NAME = 'F.DECAMPS-Directeur';
 const state = {item:null,files:[],active:0,page:1,pdf:null,zoom:1,stampUrl:null,stampBytes:null,signatures:[],selectedSignatureId:null,storageError:null,position:{x:.7,y:.78},placements:new Map(),renderToken:0};
 const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
 function message(text,error=false){el('status').textContent=text;el('status').classList.toggle('error',error)}
 function decodeBase64(text){const binary=atob(text);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return bytes}
 function encodeBase64(bytes){let result='';for(let i=0;i<bytes.length;i+=32768)result+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(result)}
+function signerName(){return el('signerName').value.trim()||DEFAULT_SIGNER_NAME}
 function signatureDate(value=new Date()){
   return new Intl.DateTimeFormat('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(value).replace(' à ', ' - ');
 }
-function signatureCaption(value=new Date()){return `${SIGNER_NAME}\n${signatureDate(value)}`}
+function signatureCaption(value=new Date()){return `${signerName()}\n${signatureDate(value)}`}
+function loadSignerName(){
+  try{el('signerName').value=localStorage.getItem('outlook-pdf-signer-name')||DEFAULT_SIGNER_NAME}catch{el('signerName').value=DEFAULT_SIGNER_NAME}
+}
 function openSignatureDb(){return new Promise((resolve,reject)=>{
   if(!window.indexedDB){reject(new Error('Le stockage local est indisponible.'));return}
   const request=indexedDB.open('outlook-pdf-signatures',1);
@@ -70,6 +74,7 @@ async function loadSignatures(){
 function getAttachment(item,id){return new Promise((resolve,reject)=>item.getAttachmentContentAsync(id,result=>result.status===Office.AsyncResultStatus.Succeeded?resolve(result.value):reject(new Error(result.error?.message||'Lecture impossible'))))}
 async function initialize(){
   try{
+    loadSignerName();
     await loadSignatures();
     if(typeof Office==='undefined')throw new Error('Ouvrez cette page depuis un message Outlook.');
     await Office.onReady();
@@ -165,6 +170,12 @@ el('stampFile').onchange=async event=>{
   finally{event.target.value=''}
 };
 el('savedStamps').onchange=event=>{const signature=state.signatures.find(s=>s.id===event.target.value);setStamp(signature||null)};
+el('signerName').oninput=()=>placeStamp();
+el('signerName').onchange=()=>{
+  const value=signerName();el('signerName').value=value;
+  try{localStorage.setItem('outlook-pdf-signer-name',value)}catch{}
+  placeStamp();
+};
 el('clearStamp').onclick=async()=>{
   const id=state.selectedSignatureId;if(!id)return;
   try{
@@ -183,7 +194,7 @@ el('next').onclick=()=>{if(state.pdf&&state.page<state.pdf.numPages){state.page+
 el('addPlacement').onclick=()=>{
   if(!state.pdf||!state.stampBytes){message('Ouvrez un PDF et choisissez un tampon PNG.',true);return}
   const key=state.active+':'+state.page;
-  state.placements.set(key,{file:state.active,page:state.page,x:state.position.x,y:state.position.y,size:Number(el('size').value),signature:state.stampUrl,signedAt:new Date().toISOString()});
+  state.placements.set(key,{file:state.active,page:state.page,x:state.position.x,y:state.position.y,size:Number(el('size').value),signature:state.stampUrl,signerName:signerName(),signedAt:new Date().toISOString()});
   renderPlacements();message('Tampon ajouté sur la page '+state.page+'.');
 };
 function renderPlacements(){
@@ -211,7 +222,7 @@ el('reply').onclick=async()=>{
         const imageY=(1-p.y)*page.getHeight()-height/2;
         page.drawImage(image,{x:imageX,y:imageY,width,height});
         const fontSize=Math.max(7,Math.min(11,page.getWidth()*.014));
-        const lines=[SIGNER_NAME,signatureDate(new Date(p.signedAt))];
+        const lines=[p.signerName||DEFAULT_SIGNER_NAME,signatureDate(new Date(p.signedAt))];
         lines.forEach((line,lineIndex)=>{
           const textWidth=captionFont.widthOfTextAtSize(line,fontSize);
           page.drawText(line,{x:p.x*page.getWidth()-textWidth/2,y:imageY-fontSize*(lineIndex+1)-3,size:fontSize,font:captionFont,color:PDFLib.rgb(.07,.07,.07)});

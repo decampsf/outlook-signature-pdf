@@ -24,6 +24,9 @@
       <label for="stampFile">Ajouter une signature PNG</label>
       <input id="stampFile" type="file" accept="image/png,.png">
       <p class="hint">Les signatures restent dans le stockage local de cet appareil. Vous pouvez en conserver plusieurs et les supprimer ici.</p>
+      <label for="signerName">Nom et fonction affichés sous la signature</label>
+      <input id="signerName" type="text" maxlength="100" autocomplete="name" value="F.DECAMPS-Directeur">
+      <p class="hint">Cette information est enregistrée uniquement sur cet appareil.</p>
       <label for="size">Taille du tampon : <output id="sizeValue">30 %</output></label>
       <input id="size" type="range" min="10" max="60" value="30">
     </section>
@@ -38,6 +41,6 @@
     <button id="reply" class="primary" type="button">Préparer la réponse avec les PDF signés</button>
     <p class="hint">Vérifiez les PDF et les destinataires dans la réponse avant l’envoi.</p>
   </main>
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
