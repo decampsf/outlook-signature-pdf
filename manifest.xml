@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+           xsi:type="MailApp">
+  <Id>5d538d06-b5c2-4e3c-b697-3497bd95ae56</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>F. Decamps</ProviderName>
+  <DefaultLocale>fr-FR</DefaultLocale>
+  <DisplayName DefaultValue="Signer les PDF"/>
+  <Description DefaultValue="Signer les pièces jointes PDF depuis un message Outlook."/>
+  <IconUrl DefaultValue="https://decampsf.github.io/outlook-signature-pdf/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://decampsf.github.io/outlook-signature-pdf/icon-80.png"/>
+  <SupportUrl DefaultValue="https://github.com/decampsf/outlook-signature-pdf"/>
+  <AppDomains>
+    <AppDomain>https://decampsf.github.io</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Mailbox"/>
+  </Hosts>
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.15"/>
+    </Sets>
+  </Requirements>
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://decampsf.github.io/outlook-signature-pdf/"/>
+        <RequestedHeight>450</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+  <Permissions>ReadWriteMailbox</Permissions>
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+  </Rule>
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides"
+                    xsi:type="VersionOverridesV1_0">
+    <Description resid="Description"/>
+    <Requirements>
+      <bt:Sets DefaultMinVersion="1.15">
+        <bt:Set Name="Mailbox"/>
+      </bt:Sets>
+    </Requirements>
+    <Hosts>
+      <Host xsi:type="MailHost">
+        <DesktopFormFactor>
+          <FunctionFile resid="Commands.Url"/>
+          <ExtensionPoint xsi:type="MessageReadCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="PdfSignature.Group">
+                <Label resid="Group.Label"/>
+                <Control xsi:type="Button" id="PdfSignature.Button">
+                  <Label resid="Button.Label"/>
+                  <Supertip>
+                    <Title resid="Button.Label"/>
+                    <Description resid="Button.Description"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16"/>
+                    <bt:Image size="32" resid="Icon.32"/>
+                    <bt:Image size="80" resid="Icon.80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16" DefaultValue="https://decampsf.github.io/outlook-signature-pdf/icon-16.png"/>
+        <bt:Image id="Icon.32" DefaultValue="https://decampsf.github.io/outlook-signature-pdf/icon-32.png"/>
+        <bt:Image id="Icon.80" DefaultValue="https://decampsf.github.io/outlook-signature-pdf/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Commands.Url" DefaultValue="https://decampsf.github.io/outlook-signature-pdf/"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://decampsf.github.io/outlook-signature-pdf/"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Group.Label" DefaultValue="Signature PDF"/>
+        <bt:String id="Button.Label" DefaultValue="Signer les PDF"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Description" DefaultValue="Signer les pièces jointes PDF depuis un message Outlook."/>
+        <bt:String id="Button.Description" DefaultValue="Ouvrir l’outil pour signer les pièces jointes PDF de ce message."/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>
