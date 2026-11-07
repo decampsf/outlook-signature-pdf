@@ -1,0 +1,18 @@
+{
+  "name": "outlook-signature-pdf",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/office-files.js --bundle --format=iife --global-name=OfficeFiles --target=es2020 --minify --outfile=vendor/office-files.js && esbuild src/auth.js --bundle --format=iife --target=es2020 --minify --outfile=vendor/auth.js",
+    "test": "node tests/run.cjs"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "5.28.0",
+    "jszip": "3.10.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "3.11.174",
+    "playwright": "1.58.2"
+  }
+}

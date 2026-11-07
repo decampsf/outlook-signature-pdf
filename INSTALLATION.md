@@ -1,4 +1,4 @@
-# Installation du complément « Signer les PDF »
+# Installation du complément « Signer les documents »
 
 ## Ce qu’il faut préparer
 
@@ -29,8 +29,8 @@ Le complément est associé au compte Outlook. Dans Outlook classique, son appar
 ## 3. Vérifier que le complément apparaît
 
 1. Ouvrir dans Outlook un message reçu contenant au moins une pièce jointe PDF réelle. Un lien vers un fichier en ligne ne suffit pas.
-2. Rechercher **Signer les PDF** dans la barre d’actions du message ou dans le menu **Applications** / **…**.
-3. Ouvrir le complément. Le volet **Signer les PDF** doit apparaître à droite du message.
+2. Rechercher **Signer les documents** dans la barre d’actions du message ou dans le menu **Applications** / **…**.
+3. Ouvrir le complément. Le volet **Signer les documents** doit apparaître à droite du message.
 
 Si l’icône est proposée dans le menu **Applications**, elle peut être épinglée pour être plus facile à retrouver.
 
@@ -45,7 +45,7 @@ Ces informations sont enregistrées uniquement sur ce PC. Elles ne sont pas ajou
 ## 5. Faire un essai complet
 
 1. Ouvrir un message de test avec un PDF joint.
-2. Lancer **Signer les PDF**.
+2. Lancer **Signer les documents**.
 3. Sélectionner le PDF et la signature.
 4. Régler la taille, puis déplacer la signature à l’endroit souhaité.
 5. Vérifier que le nom, la fonction, la date et l’heure apparaissent sous la signature.
@@ -61,7 +61,7 @@ Ces informations sont enregistrées uniquement sur ce PC. Elles ne sont pas ajou
 - Fermer complètement Outlook, puis le rouvrir.
 - Vérifier que le compte utilisé sur <https://aka.ms/olksideload> est bien celui configuré dans Outlook.
 - Dans Outlook classique, patienter : Microsoft indique que le cache peut retarder l’apparition d’un complément chargé manuellement.
-- Vérifier dans **Mes compléments** que **Signer les PDF** figure toujours parmi les compléments personnalisés.
+- Vérifier dans **Mes compléments** que **Signer les documents** figure toujours parmi les compléments personnalisés.
 
 ### Le volet indique qu’il faut l’ouvrir depuis Outlook
 
@@ -79,3 +79,20 @@ Le stockage appartient au navigateur intégré à Outlook. Une suppression des d
 ### Mise à jour de l’application
 
 Les évolutions de l’application sont publiées sur GitHub Pages. Il n’est normalement pas nécessaire de réinstaller le manifeste. Fermer puis rouvrir le volet, ou Outlook, permet de charger la version la plus récente.
+
+
+
+## Signer un fichier Word ou Excel
+
+1. Ouvrir un message contenant un fichier `.docx` ou `.xlsx`, puis lancer le complément.
+2. Choisir la pièce jointe et une signature enregistrée.
+3. Pour Word, choisir le paragraphe où ajouter la signature. Pour Excel, choisir une feuille visible et une cellule de départ (par exemple `B12`). Régler la largeur en centimètres.
+4. Cliquer sur **Ajouter la signature à cet emplacement**. Plusieurs signatures peuvent être ajoutées ou retirées.
+5. Choisir **Conserver le format d’origine** ou **Renvoyer en PDF**, séparément pour chaque document.
+6. Pour l’aperçu ou la sortie PDF, connecter le compte OneDrive professionnel puis demander **Afficher l’aperçu PDF signé**. La [configuration Microsoft 365](CONFIGURATION_MICROSOFT_365.md) doit avoir été effectuée au préalable.
+7. Cliquer sur **Préparer la réponse avec les documents signés**. Seuls les fichiers auxquels une signature a été ajoutée sont joints.
+8. Ouvrir les pièces jointes et vérifier leur contenu, la position des signatures et les destinataires avant d’envoyer.
+
+Le format d’origine fonctionne sans connexion Microsoft 365. L’aperçu et la sortie PDF utilisent une copie temporaire dans OneDrive, ensuite placée dans sa corbeille. La conversion est limitée à 2 Mo sur le fichier signé. Dans Excel, la signature doit se trouver dans la zone d’impression pour apparaître dans le PDF. Dans Word, son insertion peut déplacer le texte suivant.
+
+Les anciens formats `.doc` / `.xls` doivent être réenregistrés en `.docx` / `.xlsx` dans Office. Les formats à macros et les fichiers protégés ne sont pas traités par cette version.
