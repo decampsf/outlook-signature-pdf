@@ -1,4 +1,4 @@
-/* Les PDF et le tampon sont traités dans le navigateur. Aucune requête ne les envoie au site. */
+/* Les originaux sont signés localement. La conversion Office en PDF utilise le OneDrive connecté. */
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 const el = id => document.getElementById(id);
 const canvas = el('canvas');
@@ -6,7 +6,7 @@ const ctx = canvas.getContext('2d');
 const stamp = el('stamp');
 const stampCaption = el('stampCaption');
 const DEFAULT_SIGNER_NAME = 'F.DECAMPS-Directeur';
-const state = {item:null,files:[],active:0,page:1,pdf:null,zoom:1,stampUrl:null,stampBytes:null,signatures:[],selectedSignatureId:null,storageError:null,position:{x:.7,y:.78},placements:new Map(),renderToken:0};
+const state = {item:null,files:[],active:0,page:1,pdf:null,zoom:1,stampUrl:null,stampBytes:null,signatures:[],selectedSignatureId:null,storageError:null,position:{x:.7,y:.78},placements:new Map(),renderToken:0,selectionToken:0,busy:false};
 const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
 function message(text,error=false){el('status').textContent=text;el('status').classList.toggle('error',error)}
 function decodeBase64(text){const binary=atob(text);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return bytes}
@@ -83,9 +83,9 @@ async function initialize(){
     const item=Office.context.mailbox.item;
     if(!item?.attachments||!item.displayReplyFormAsync)throw new Error('Ouvrez un message reçu dans Outlook.');
     state.item=item;
-    const attachments=item.attachments.filter(a=>!a.isInline&&/\.pdf$/i.test(a.name||''));
-    if(!attachments.length){message('Aucun PDF joint à ce message.');return}
-    state.files=attachments.map(a=>({id:a.id,name:a.name,bytes:null,pdf:null}));
+    const attachments=item.attachments.filter(a=>!a.isInline&&/\.(pdf|docx|xlsx)$/i.test(a.name||''));
+    if(!attachments.length){message('Aucun PDF, Word (.docx) ou Excel (.xlsx) joint. Les anciens formats .doc et .xls doivent être réenregistrés dans Office.');return}
+    state.files=attachments.map(a=>({id:a.id,name:a.name,kind:a.name.split('.').pop().toLowerCase(),bytes:null,pdf:null,officeInfo:null,officePlacements:[],output:'original',revision:0}));
     renderFileList();await selectFile(0);
   }catch(error){message(error.message,true)}
 }
@@ -102,18 +102,57 @@ function showZoom(){
   el('zoomIn').disabled=state.zoom>=3;
   el('zoomReset').disabled=state.zoom===1;
 }
+function setBusy(value){
+  if(state.busy===value)return;
+  state.busy=value;
+  for(const node of document.querySelectorAll('button,input,select')){
+    if(value){node.dataset.wasDisabled=String(node.disabled);node.disabled=true}
+    else{node.disabled=node.dataset.wasDisabled==='true';delete node.dataset.wasDisabled}
+  }
+  if(!value){showZoom();if(state.pdf){el('prev').disabled=state.page===1;el('next').disabled=state.page===state.pdf.numPages}}
+}
+function updateDocumentView(){
+  const file=state.files[state.active];const native=file&&file.kind!=='pdf';
+  el('officeControls').hidden=!native;el('m365Controls').hidden=!native;
+  el('pdfViewer').hidden=native&&!state.pdf;
+  el('pdfPlacementControls').hidden=!!native;el('pdfPlacementHint').hidden=!!native;
+  el('size').parentElement.querySelector('label[for="size"]').hidden=!!native;el('size').hidden=!!native;
+  if(native&&file.officeInfo){
+    el('officeHint').textContent=file.kind==='docx'?'La signature sera ajoutée dans le paragraphe choisi, sous son texte. Elle peut déplacer le contenu suivant.':'La signature sera ajoutée comme une image dans la feuille choisie, à partir de la cellule indiquée.';
+    el('officeTargetLabel').textContent=file.kind==='docx'?'Paragraphe où insérer la signature':'Feuille de calcul';
+    el('excelCellRow').hidden=file.kind!=='xlsx';
+    const select=el('officeTarget');select.replaceChildren();
+    file.officeInfo.targets.forEach((target,index)=>{const o=document.createElement('option');o.value=String(target.id);o.textContent=(file.kind==='docx'?`${index+1} — `:'')+target.label+(target.protected?' (protégée)':'');o.disabled=!!target.protected;select.append(o)});
+    const first=Array.from(select.options).find(o=>!o.disabled);if(first)select.value=first.value;
+    el('outputFormat').value=file.output;
+  }
+  stamp.style.display='none';stampCaption.style.display='none';renderOfficePlacements();
+}
 async function selectFile(index){
+  if(state.busy)return;
+  const selection=++state.selectionToken;
   ++state.renderToken;state.active=index;state.page=1;state.pdf=null;state.zoom=1;showZoom();state.position={x:.7,y:.78};renderFileList();renderPlacements();
-  const file=state.files[index];message('Ouverture de '+file.name+'…');
+  canvas.width=0;canvas.height=0;
+  const file=state.files[index];updateDocumentView();message('Ouverture de '+file.name+'…');
   try{
     if(!file.bytes){
       const content=await getAttachment(state.item,file.id);
-      if(content.format!==Office.MailboxEnums.AttachmentContentFormat.Base64)throw new Error('Cette pièce jointe est un lien ou un type non pris en charge. Téléchargez le PDF joint au message.');
+      if(content.format!==Office.MailboxEnums.AttachmentContentFormat.Base64)throw new Error('Un fichier joint est nécessaire, pas un lien vers un document.');
       file.bytes=decodeBase64(content.content);
     }
-    if(!file.pdf)file.pdf=await pdfjsLib.getDocument({data:file.bytes.slice()}).promise;
-    state.pdf=file.pdf;await renderPage();message(file.name+' prêt.'+(state.storageError?' '+state.storageError:''),!!state.storageError);
-  }catch(error){message('Impossible d’ouvrir '+file.name+' : '+error.message,true)}
+    if(selection!==state.selectionToken)return;
+    if(file.kind==='pdf'){
+      if(!file.pdf)file.pdf=await pdfjsLib.getDocument({isEvalSupported:false,data:file.bytes.slice()}).promise;
+      if(selection!==state.selectionToken)return;
+      state.pdf=file.pdf;updateDocumentView();await renderPage();
+    }else{
+      if(!file.officeInfo)file.officeInfo=await OfficeFiles.inspect(file.bytes,file.kind);
+      if(selection!==state.selectionToken)return;
+      if(file.previewPdf&&file.previewRevision===file.revision)state.pdf=file.previewPdf;
+      updateDocumentView();if(state.pdf)await renderPage();
+    }
+    if(selection===state.selectionToken)message(file.name+' prêt.'+(state.storageError?' '+state.storageError:''),!!state.storageError);
+  }catch(error){if(selection===state.selectionToken)message('Impossible d’ouvrir '+file.name+' : '+error.message,true)}
 }
 async function renderPage(preserveView=false){
   if(!state.pdf)return;
@@ -136,7 +175,7 @@ async function renderPage(preserveView=false){
   placeStamp();renderPlacements();
 }
 function placeStamp(){
-  if(!state.stampUrl||!stamp.naturalWidth||!canvas.width){stamp.style.display='none';stampCaption.style.display='none';return}
+  if(state.files[state.active]?.kind!=='pdf'||!state.stampUrl||!stamp.naturalWidth||!canvas.width){stamp.style.display='none';stampCaption.style.display='none';return}
   const width=canvas.width*Number(el('size').value)/100,height=width*stamp.naturalHeight/stamp.naturalWidth;
   stamp.style.width=width+'px';stamp.style.height=height+'px';
   stamp.style.left=(state.position.x*canvas.width-width/2)+'px';
@@ -192,7 +231,7 @@ showZoom();
 el('prev').onclick=()=>{if(state.pdf&&state.page>1){state.page--;renderPage()}};
 el('next').onclick=()=>{if(state.pdf&&state.page<state.pdf.numPages){state.page++;renderPage()}};
 el('addPlacement').onclick=()=>{
-  if(!state.pdf||!state.stampBytes){message('Ouvrez un PDF et choisissez un tampon PNG.',true);return}
+  if(state.busy||state.files[state.active]?.kind!=='pdf'||!state.pdf||!state.stampBytes){message('Ouvrez un PDF et choisissez un tampon PNG.',true);return}
   const key=state.active+':'+state.page;
   state.placements.set(key,{file:state.active,page:state.page,x:state.position.x,y:state.position.y,size:Number(el('size').value),signature:state.stampUrl,signerName:signerName(),signedAt:new Date().toISOString()});
   renderPlacements();message('Tampon ajouté sur la page '+state.page+'.');
@@ -205,12 +244,22 @@ function renderPlacements(){
 }
 function openReply(formData){return new Promise((resolve,reject)=>state.item.displayReplyFormAsync(formData,result=>result.status===Office.AsyncResultStatus.Succeeded?resolve():reject(new Error(result.error?.message||'Réponse impossible'))))}
 el('reply').onclick=async()=>{
-  if(state.placements.size===0){message('Ajoutez au moins une signature sur une page.',true);return}
-  const button=el('reply');button.disabled=true;message('Création des PDF signés…');
+  if(state.busy)return;
+  if(state.placements.size===0&&!state.files.some(f=>f.officePlacements.length)){message('Ajoutez au moins une signature.',true);return}
+  setBusy(true);message('Création des documents signés…');
   try{
     const attachments=[];
     for(let index=0;index<state.files.length;index++){
-      const file=state.files[index];const placements=[...state.placements.values()].filter(p=>p.file===index);
+      const file=state.files[index];
+      if(file.kind!=='pdf'){
+        if(!file.officePlacements.length)continue;
+        let bytes=await signedOffice(file),extension=file.kind;
+        if(file.output==='pdf'){bytes=await officePdf(file,bytes);extension='pdf'}
+        if(bytes.length>25*1024*1024)throw new Error(file.name+' dépasse 25 Mo.');
+        attachments.push({type:Office.MailboxEnums.AttachmentType.Base64,name:file.name.replace(/\.[^.]+$/,'')+' - signé.'+extension,base64file:encodeBase64(bytes),inLine:false});
+        continue;
+      }
+      const placements=[...state.placements.values()].filter(p=>p.file===index);
       if(!placements.length)continue;
       const doc=await PDFLib.PDFDocument.load(file.bytes.slice());const images=new Map();
       const captionFont=await doc.embedFont(PDFLib.StandardFonts.Helvetica);
@@ -232,11 +281,86 @@ el('reply').onclick=async()=>{
       if(bytes.length>25*1024*1024)throw new Error(file.name+' dépasse la limite Outlook de 25 Mo.');
       attachments.push({type:Office.MailboxEnums.AttachmentType.Base64,name:file.name.replace(/\.pdf$/i,'')+' - signé.pdf',base64file:encodeBase64(bytes),inLine:false});
     }
-    if(!attachments.length)throw new Error('Aucun PDF signé à joindre.');
+    if(!attachments.length)throw new Error('Aucun document signé à joindre.');
     message('Ouverture de la réponse…');
     await openReply({htmlBody:attachments.length===1?'Bonjour,<br><br>Veuillez trouver ci-joint le document signé.<br><br>Cordialement,':'Bonjour,<br><br>Veuillez trouver ci-joint les documents signés.<br><br>Cordialement,',attachments});
     message('Réponse ouverte. Vérifiez les pièces jointes et les destinataires avant l’envoi.');
   }catch(error){message('Impossible de préparer la réponse : '+error.message,true)}
-  finally{button.disabled=false}
+  finally{setBusy(false)}
 };
+function renderOfficePlacements(){
+  const root=el('officePlacements');root.replaceChildren();
+  const file=state.files[state.active];if(!file||file.kind==='pdf')return;
+  for(const [index,p] of file.officePlacements.entries()){
+    const row=document.createElement('div'),label=document.createElement('span'),remove=document.createElement('button');
+    label.textContent=p.label;remove.type='button';remove.textContent='Retirer';
+    remove.onclick=()=>{if(state.busy)return;file.officePlacements.splice(index,1);invalidateOffice(file);renderOfficePlacements()};
+    row.append(label,remove);root.append(row);
+  }
+}
+function invalidateOffice(file){
+  file.revision++;file.signedBytes=null;file.convertedBytes=null;file.previewPdf=null;
+  if(state.files[state.active]===file){++state.renderToken;state.pdf=null;el('pdfViewer').hidden=true;stamp.style.display='none';stampCaption.style.display='none'}
+}
+async function compositeStamp(widthCm){
+  if(!state.stampUrl)throw new Error('Choisissez une signature PNG.');
+  const img=new Image();img.src=state.stampUrl;await img.decode();
+  const c=document.createElement('canvas');c.width=900;
+  const imageHeight=Math.round(c.width*img.naturalHeight/img.naturalWidth);
+  if(!Number.isFinite(imageHeight)||imageHeight>3000)throw new Error('Choisissez une signature plus large que haute.');
+  let fontSize=Math.round(9/72*2.54/widthCm*c.width);
+  const caption=signatureCaption(),lines=caption.split('\n');
+  const measure=c.getContext('2d');measure.font=fontSize+'px Arial';
+  const longest=Math.max(...lines.map(line=>measure.measureText(line).width));if(longest>880)fontSize=Math.floor(fontSize*880/longest);
+  c.height=imageHeight+Math.round(fontSize*2.7)+12;
+  const context=c.getContext('2d');context.drawImage(img,0,0,c.width,imageHeight);context.font=fontSize+'px Arial';context.fillStyle='#111';context.textAlign='center';
+  lines.forEach((line,i)=>context.fillText(line,c.width/2,imageHeight+fontSize*(i+1.1)+4));
+  return {image:c.toDataURL('image/png'),pixelWidth:c.width,pixelHeight:c.height,caption};
+}
+el('addOfficePlacement').onclick=async()=>{
+  if(state.busy)return;
+  const file=state.files[state.active];if(!file?.officeInfo)return;
+  const target=el('officeTarget').value,widthCm=Number(el('officeWidth').value),cell=el('excelCell').value;
+  try{
+    if(!target||!Number.isFinite(widthCm)||widthCm<2||widthCm>12)throw new Error('Choisissez un emplacement et une largeur entre 2 et 12 cm.');
+    if(file.kind==='xlsx')OfficeFiles.cellAddress(cell);
+    setBusy(true);
+    const composed=await compositeStamp(widthCm);
+    const label=file.kind==='docx'?'Signature au paragraphe '+(Number(target)+1):'Signature — '+file.officeInfo.targets.find(t=>t.id===target).label+' · '+cell.toUpperCase();
+    file.officePlacements.push({...composed,target,widthCm,cell,label});invalidateOffice(file);renderOfficePlacements();message('Signature ajoutée. Choisissez le format de renvoi ou vérifiez l’aperçu PDF.');
+  }catch(error){message(error.message,true)}finally{setBusy(false)}
+};
+el('outputFormat').onchange=event=>{const file=state.files[state.active];if(file)file.output=event.target.value};
+async function signedOffice(file){
+  if(!file.signedBytes)file.signedBytes=await OfficeFiles.sign(file.bytes,file.kind,file.officePlacements);
+  return file.signedBytes;
+}
+async function officePdf(file,bytes){
+  if(!file.convertedBytes){const result=await OneDrivePDF.convert(bytes,file.kind);file.convertedBytes=result.bytes;if(result.warning)el('cleanupWarning').textContent=result.warning}
+  return file.convertedBytes;
+}
+el('previewOffice').onclick=async()=>{
+  if(state.busy)return;const file=state.files[state.active];
+  if(!file?.officePlacements.length){message('Ajoutez une signature avant de demander l’aperçu.',true);return}
+  setBusy(true);message('Conversion et chargement de l’aperçu…');
+  try{
+    const bytes=await officePdf(file,await signedOffice(file));
+    file.previewPdf=await pdfjsLib.getDocument({isEvalSupported:false,data:bytes.slice()}).promise;file.previewRevision=file.revision;
+    state.pdf=file.previewPdf;state.page=1;state.zoom=1;el('pdfViewer').hidden=false;await renderPage();
+    message('Aperçu du document signé. Vérifiez la position de la signature et les pages avant de préparer la réponse.');
+  }catch(error){message(error.message,true)}finally{setBusy(false);showZoom()}
+};
+function m365Status(){
+  const account=OneDrivePDF.account();el('m365Status').textContent=account?'OneDrive connecté : '+account:'Non connecté.';
+  el('disconnectM365').hidden=!account;el('connectM365').textContent=account?'Reconnecter / changer de compte':'Connecter mon OneDrive professionnel';
+  el('m365Setup').hidden=OneDrivePDF.configured();el('connectM365').disabled=!OneDrivePDF.configured();
+}
+el('connectM365').onclick=async()=>{
+  if(state.busy)return;setBusy(true);
+  try{await OneDrivePDF.connect();const remaining=await OneDrivePDF.retryCleanup();el('cleanupWarning').textContent=remaining?remaining+' copie(s) temporaire(s) restent dans OneDrive. Réessayez la connexion.':'';message('Connexion Microsoft 365 établie.')}
+  catch(error){message(error.message,true)}finally{setBusy(false);m365Status()}
+};
+el('disconnectM365').onclick=()=>{OneDrivePDF.disconnect();m365Status();message('Le complément est déconnecté de OneDrive.')};
+m365Status();
 initialize();
+

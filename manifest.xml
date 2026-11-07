@@ -5,11 +5,11 @@
            xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
            xsi:type="MailApp">
   <Id>5d538d06-b5c2-4e3c-b697-3497bd95ae56</Id>
-  <Version>1.0.0.0</Version>
+  <Version>1.1.0.0</Version>
   <ProviderName>F. Decamps</ProviderName>
   <DefaultLocale>fr-FR</DefaultLocale>
-  <DisplayName DefaultValue="Signer les PDF"/>
-  <Description DefaultValue="Signer les pièces jointes PDF depuis un message Outlook."/>
+  <DisplayName DefaultValue="Signer les documents"/>
+  <Description DefaultValue="Signer les pièces jointes PDF, Word et Excel depuis Outlook."/>
   <IconUrl DefaultValue="https://decampsf.github.io/outlook-signature-pdf/icon-64.png"/>
   <HighResolutionIconUrl DefaultValue="https://decampsf.github.io/outlook-signature-pdf/icon-80.png"/>
   <SupportUrl DefaultValue="https://github.com/decampsf/outlook-signature-pdf"/>
@@ -85,13 +85,14 @@
         <bt:Url id="Taskpane.Url" DefaultValue="https://decampsf.github.io/outlook-signature-pdf/"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="Group.Label" DefaultValue="Signature PDF"/>
-        <bt:String id="Button.Label" DefaultValue="Signer les PDF"/>
+        <bt:String id="Group.Label" DefaultValue="Signature de documents"/>
+        <bt:String id="Button.Label" DefaultValue="Signer les documents"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="Description" DefaultValue="Signer les pièces jointes PDF depuis un message Outlook."/>
-        <bt:String id="Button.Description" DefaultValue="Ouvrir l’outil pour signer les pièces jointes PDF de ce message."/>
+        <bt:String id="Description" DefaultValue="Signer les pièces jointes PDF, Word et Excel depuis Outlook."/>
+        <bt:String id="Button.Description" DefaultValue="Signer les pièces jointes PDF, Word et Excel de ce message."/>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>
 </OfficeApp>
+
